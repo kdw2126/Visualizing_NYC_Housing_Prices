@@ -17,35 +17,64 @@ dashboardPage(
     dashboardSidebar(
       sidebarMenu(
         menuItem("Visualizing Development", tabName ="develop", icon = icon("map")),
-        menuItem(HTML("Economic Characteristics <br/>by ZIP Code"), tabName ="demo", icon = icon("chart-line")),
+        menuItem(HTML("Taxpayer Data <br/>by ZIP Code"), tabName ="taxer", icon = icon("chart-line")),
+        menuItem(HTML("Business Data <br/>by ZIP Code"), tabName ="buss", icon = icon("chart-line")),
+        menuItem(HTML("Employee Data <br/>by ZIP Code"), tabName ="employee", icon = icon("chart-line")),
+        
         menuItem("Variable Definitions", tabName ="variable_def", icon = icon("book")),
         menuItem(HTML("About the Author <br/>(Kyle D. Weber)"), tabName ="author_bio", icon = icon("book"))
         )
       ),
     dashboardBody(
       tabItems(tabItem(tabName ="develop",
+                         fluidRow(
+                           leafletOutput("my_item"), height = "100%"),
+                         box(
+                           status = "primary", solidHeader = F,
+                           collapsible = F,
+                           splitLayout(
+                             selectInput("geography", "Geographies to Use", c("Neighborhoods" = "neighbor", "Census Tracts" = "tracts", "ZIP Codes" = "zips"), selectize = FALSE),
+                             selectInput("data_type", "Data to Show", c("New Structures" = "ns", "Structures Demolished" = "dem",
+                                                                        "Structures Converted" = "cs"), selectize = FALSE),
+                             selectInput("lrg_developers", "Construction Projects to Include", c("All Projects" = "ALL", "Residential" = "NO", "Non-Residential" = "YES"), selectize = FALSE),
+                             selectInput("project_assignment", "Assign Projects to Year...", c("Submitted" = "filed_year", "Approved" = "issued_year", "Construction Began" = "start_year"), selectize = FALSE),                             
+                             selectInput("typpe", "Shade Areas Based On", c("Quantiles" = "quant", "Raw Values" = "vals"), selectize = FALSE)
+                           ),
+                           splitLayout(
+                             sliderInput("slider", "Year", 2004, min = 2004, max = 2019, step = 1, sep = "")
+                             )
+                         
+                         , width = "100%", height = "25%")),        
+               tabItem(tabName ="taxer",
                        fluidRow(
-                         leafletOutput("my_item"), width = 12
+                         splitLayout(cellWidths = c("100%"), plotOutput("population"))
                          ),
                        box(
                          status = "primary", solidHeader = F,
                          collapsible = F,
                          splitLayout(
-                         selectInput("data_type", "Data to Show", c("New Structures" = "ns",
-                                                                    "Conversions" = "cs"), selectize = FALSE),
-                         selectInput("lrg_developers", "Construction Projects to Include", c("Residential" = "YES", "Non-Residential" = "NO"), selectize = FALSE),
-                         selectInput("project_assignment", "Assign Projects to Year...", c("Submitted" = "filed_year", "Approved" = "issued_year", "Construction Began" = "start_year"), selectize = FALSE),
-                         numericInput("slider", "Year", 1990, min = 1990, max = 2019, step = 1)), width = 12)),        
-               tabItem(tabName ="demo",
+                           selectInput("specific_zip_taxer", "Zip Code:", sort(unique(income_data$zipcode)), selectize = FALSE)
+                         ), width = 12)),
+               tabItem(tabName ="buss",
                        fluidRow(
-                         splitLayout(cellWidths = c("50%", "50%"), plotOutput("population"), plotOutput("industry_breakdown"))
-                         ),
+                         splitLayout(cellWidths = c("50%", "50%"), plotOutput("industry_breakdown"), plotOutput("large_industry_breakdown"))
+                       ),
                        box(
                          status = "primary", solidHeader = F,
                          collapsible = F,
                          splitLayout(
-                           selectInput("specific_zip", "Zip Code:", sort(unique(income_data$zipcode)), selectize = FALSE),
+                           selectInput("specific_zip_buss", "Zip Code:", sort(unique(income_data$zipcode)), selectize = FALSE),
                            selectInput("bus_display", "Business to Display", c("All Businesses" = "total", "Construction" = "construction", "Manufacturing" = "manufacturing", "Wholesale" = "wholesale", "Retail" = "retail", "Logistics" = "logistics", "White Collar" = "professional", "Education" = "education", "Health Care" = "health_care", "Other Services" = "services", "Government" = "government", "Entertainment" = "entertainment"), selectize = FALSE)
+                         ), width = 12)),
+               tabItem(tabName ="employee",
+                       fluidRow(
+                         splitLayout(cellWidths = c("50%", "50%"), plotOutput("total_employed"), plotOutput("total_payroll"))
+                       ),
+                       box(
+                         status = "primary", solidHeader = F,
+                         collapsible = F,
+                         splitLayout(
+                           selectInput("specific_zip_employee", "Zip Code:", sort(unique(income_data$zipcode)), selectize = FALSE)
                          ), width = 12)),
                tabItem(tabName ="variable_def",
                        fluidRow(

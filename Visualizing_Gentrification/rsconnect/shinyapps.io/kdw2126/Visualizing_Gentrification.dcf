@@ -5,8 +5,8 @@ account: kdw2126
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1329018
-bundleId: 2500717
+bundleId: 2506116
 url: https://kdw2126.shinyapps.io/Visualizing_Gentrification/
-when: 1571107762.19446
+when: 1571248843.92337
 asMultiple: FALSE
 asStatic: FALSE

@@ -13,7 +13,8 @@ setwd("~/Permit Information")
 permit_information = read.csv("DOB_Permit_Issuance.csv", stringsAsFactors = T)
 
 permit_information = permit_information %>%
-  select(-"Bin..", -"House..", -"Street.Name", -"Expiration.Date", -"Self_Cert", -"Owner.s.Business.Type", -"HIC.License", -"Job.doc...", -"Site.Fill", -"PERMIT_SI_NO", -"Work.Type", -"Act.as.Superintendent", -"Community.Board", -"COUNCIL_DISTRICT", -"Permittee.s.Other.Title", -"Block", -"Lot", -"Oil.Gas", -"DOBRunDate", -"Permittee.s.License..", -"Owner.s.Business.Name", -"Owner.s.First.Name", -"Owner.s.Last.Name", -"LATITUDE", -"LONGITUDE", -"Non.Profit", -"Bldg.Type", -starts_with("Site.Safety"), -starts_with("Super"), -contains("Permittee"), -contains("Phone")) %>%
+  select(-"Bin..", -"Job..", -"Expiration.Date", -"Self_Cert", -"Owner.s.Business.Type", -"HIC.License", -"Job.doc...", -"Site.Fill", -"PERMIT_SI_NO", -"Work.Type", -"Act.as.Superintendent", -"Community.Board", -"COUNCIL_DISTRICT", -"Permittee.s.Other.Title", -"Block", -"Lot", -"Oil.Gas", -"DOBRunDate", -"Permittee.s.License..", -"Owner.s.Business.Name", -"Owner.s.First.Name", -"Owner.s.Last.Name", -"LATITUDE", -"LONGITUDE", -"Non.Profit", -"Bldg.Type", -starts_with("Site.Safety"), -starts_with("Super"), -contains("Permittee"), -contains("Phone")) %>%
+  unite(address, c("House..", "Street.Name"), sep=" ") %>%
   rename(borough = BOROUGH, neighborhood_name = NTA_NAME) %>%
   select(-contains("House"), -contains("Special.District")) %>%
   filter(Job.Type != "A3" | Job.Type != "SG") %>%
@@ -34,8 +35,28 @@ permit_information = permit_information %>%
   mutate(new_building = (Permit.Type == "NB" | Job.Type == "NB")) %>%
   mutate(demolition = (Permit.Type == "DM" | Job.Type == "DM")) %>%
   mutate(conversion = (Permit.Type == "A1" | Job.Type == "A1")) %>%
-  group_by(filed_year, issued_year, start_year, CENSUS_TRACT, Residential) %>%
+  mutate(
+    COUNTYFP = case_when(
+      borough == "BRONX" ~ "005",
+      borough == "BROOKLYN" ~ "047",
+      borough == "MANHATTAN" ~ "061",
+      borough == "QUEENS" ~ "081",
+      borough == "STATEN ISLAND" ~ "085",
+     )
+    )
+
+write.csv(permit_information, "Raw Permit Information.csv", row.names = FALSE)
+
+rm(permit_information)
+
+#### Build Tract Data
+
+tract_permit_information = read.csv("Raw Permit Information.csv", stringsAsFactors = F, colClasses = c(rep("character",12), rep("numeric", 3), rep("logical", 3), "character"))
+
+tract_permit_information = tract_permit_information %>%
+  group_by(address, filed_year, issued_year, start_year, COUNTYFP, CENSUS_TRACT, Residential) %>%
   summarise(ns = sum(new_building), dem = sum(demolition), cs = sum(conversion)) %>%
+  mutate(ns = ifelse(ns >= 1, 1, 0), dem = ifelse(dem >= 1, 1, 0), cs = ifelse(cs >= 1, 1, 0)) %>%
   mutate(Residential = ifelse(Residential == "YES", "YES", "NO")) %>%
   pivot_longer(c(filed_year, issued_year, start_year), values_to = "Year", names_to = "year_type")  %>%
   pivot_longer(c(ns, dem, cs), values_to = "outcome", names_to = "outcome_variable") %>%
@@ -43,10 +64,58 @@ permit_information = permit_information %>%
   mutate(year_type = as.character(year_type)) %>%
   mutate(outcome_variable = as.character(outcome_variable)) %>%
   ungroup() %>%
+  group_by(COUNTYFP, CENSUS_TRACT, Residential, year_type, Year, outcome_variable) %>%
+  summarise(outcome = sum(outcome)) %>%
+  ungroup() %>%
   rename(NAME = CENSUS_TRACT) %>%
   mutate(NAME = as.character(NAME))
 
-write.csv(permit_information, "Permits by Census Tract.csv")
+write.csv(tract_permit_information, "Permits by Census Tract.csv", row.names = FALSE)
+
+#### Build ZIP Data
+
+zip_permit_information = read.csv("Raw Permit Information.csv", stringsAsFactors = F, colClasses = c(rep("character",12), rep("numeric", 3), rep("logical", 3), "character"))
+
+zip_permit_information = zip_permit_information %>%
+  group_by(address, filed_year, issued_year, start_year, Zip.Code, Residential) %>%
+  summarise(ns = sum(new_building), dem = sum(demolition), cs = sum(conversion)) %>%
+  mutate(ns = ifelse(ns >= 1, 1, 0), dem = ifelse(dem >= 1, 1, 0), cs = ifelse(cs >= 1, 1, 0)) %>%
+  mutate(Residential = ifelse(Residential == "YES", "YES", "NO")) %>%
+  pivot_longer(c(filed_year, issued_year, start_year), values_to = "Year", names_to = "year_type")  %>%
+  pivot_longer(c(ns, dem, cs), values_to = "outcome", names_to = "outcome_variable") %>%
+  mutate(Residential = as.character(Residential)) %>%
+  mutate(year_type = as.character(year_type)) %>%
+  mutate(outcome_variable = as.character(outcome_variable)) %>%
+  ungroup() %>%
+  group_by(Zip.Code, Residential, year_type, Year, outcome_variable) %>%
+  summarise(outcome = sum(outcome)) %>%
+  ungroup() %>%
+  mutate(ZCTA5CE10 = as.character(Zip.Code))
+
+write.csv(zip_permit_information, "Permits by ZIP.csv", row.names = FALSE)
+
+#### Build Neighborhood Data
+
+nta_permit_information = read.csv("Raw Permit Information.csv", stringsAsFactors = F, colClasses = c(rep("character",12), rep("numeric", 3), rep("logical", 3), "character"))
+
+nta_permit_information = nta_permit_information %>%
+  group_by(address, filed_year, issued_year, start_year, neighborhood_name, Residential) %>%
+  summarise(ns = sum(new_building), dem = sum(demolition), cs = sum(conversion)) %>%
+  mutate(Residential = ifelse(Residential == "YES", "YES", "NO")) %>%
+  mutate(ns = ifelse(ns >= 1, 1, 0), dem = ifelse(dem >= 1, 1, 0), cs = ifelse(cs >= 1, 1, 0)) %>%
+  pivot_longer(c(filed_year, issued_year, start_year), values_to = "Year", names_to = "year_type")  %>%
+  pivot_longer(c(ns, dem, cs), values_to = "outcome", names_to = "outcome_variable") %>%
+  mutate(Residential = as.character(Residential)) %>%
+  mutate(year_type = as.character(year_type)) %>%
+  mutate(outcome_variable = as.character(outcome_variable)) %>%
+  ungroup() %>%
+  group_by(neighborhood_name, Residential, year_type, Year, outcome_variable) %>%
+  summarise(outcome = sum(outcome)) %>%
+  ungroup() %>%
+  mutate(ntaname = as.character(neighborhood_name))
+
+write.csv(nta_permit_information, "Permits by Neighborhood.csv", row.names = FALSE)
+
 
   
 #### Income-Specific Data
@@ -85,7 +154,7 @@ income_data = income_data %>%
   mutate(total_income = total_income / CPI.Value * 100, wage_income = wage_income / CPI.Value * 100) %>%
   select(-CPI.Value)
 
-write.csv(income_data, "Income_Info.csv")
+write.csv(income_data, "Income_Info.csv", row.names = FALSE)
 
 #### Industry-Specific Data
 
@@ -144,7 +213,7 @@ industry_data = industry_data %>%
   mutate(professional_est = professional_est + information_est + finance_est + real_estate_est + professional_est + management_est + administration_est) %>%
   select(-starts_with("accomedation"), -starts_with("arts"), -starts_with("information"), -starts_with("finance"), -starts_with("real_estate"), -starts_with("management"), -starts_with("administration"))  
 
-write.csv(industry_data, "Aggregated_Industry_Info.csv")
+write.csv(industry_data, "Aggregated_Industry_Info.csv", row.names = FALSE)
 
 #### Aggregate Information about Employment and Earnings
 
@@ -158,7 +227,7 @@ for(i in 1:length(file.names)){
     select(zip, emp, ap, qp1) %>%
     filter(zip >= 10000 & zip <= 11699) %>%
     filter(!(zip >= 10600 & zip <= 10999)) %>%
-    mutate(year = as.numeric(substr(file.names[1], 4, 5)) + 2000)
+    mutate(year = as.numeric(substr(file.names[i], 4, 5)) + 2000)
   employment_info <- rbind(employment_info, file)
 }
 
@@ -172,4 +241,4 @@ employment_info = employment_info %>%
   mutate(ap = ap / CPI.Value * 100, qp1 = qp1 / CPI.Value * 100) %>%
   select(-CPI.Value)
   
-write.csv(employment_info, "Aggregated_Employment_Info.csv")
+write.csv(employment_info, "Aggregated_Employment_Info.csv", row.names = FALSE)
